@@ -12,18 +12,30 @@ st.set_page_config(page_title="Dashboard de Clima Organizacional", layout="wide"
 
 @st.cache_data
 def load_data():
-    """Carrega os arquivos Excel"""
-    surveys = pd.read_excel('arquivos/surveys.xlsx')
-    categories = pd.read_excel('arquivos/categories.xlsx')
-    questions = pd.read_excel('arquivos/questions.xlsx')
-    responses = pd.read_excel('arquivos/responses.xlsx')
-    answers = pd.read_excel('arquivos/answers.xlsx')
-    return surveys, categories, questions, responses, answers
+    """Carrega os arquivos Excel de diferentes caminhos possíveis"""
+    paths = [
+        ('arquivos/', 'Pasta arquivos'),
+        ('', 'Raiz do repositório'),
+    ]
+    
+    for path_prefix, desc in paths:
+        try:
+            surveys = pd.read_excel(f'{path_prefix}surveys.xlsx')
+            categories = pd.read_excel(f'{path_prefix}categories.xlsx')
+            questions = pd.read_excel(f'{path_prefix}questions.xlsx')
+            responses = pd.read_excel(f'{path_prefix}responses.xlsx')
+            answers = pd.read_excel(f'{path_prefix}answers.xlsx')
+            return surveys, categories, questions, responses, answers
+        except (FileNotFoundError, Exception):
+            continue
+    
+    # Se nenhum caminho funcionou
+    raise FileNotFoundError("❌ Arquivos Excel não encontrados em nenhum caminho!")
 
 try:
     surveys, categories, questions, responses, answers = load_data()
-except FileNotFoundError:
-    st.error("❌ Coloque os arquivos Excel na mesma pasta do script!")
+except FileNotFoundError as e:
+    st.error(str(e))
     st.stop()
 
 # ======================================================

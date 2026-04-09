@@ -13,11 +13,11 @@ st.set_page_config(page_title="Dashboard de Clima Organizacional", layout="wide"
 @st.cache_data
 def load_data():
     """Carrega os arquivos Excel"""
-    surveys = pd.read_excel(r'C:\Users\VALEMAIS PROMOTORA\OneDrive\Desktop\planilhas_rh\surveys.xlsx')
-    categories = pd.read_excel(r'C:\Users\VALEMAIS PROMOTORA\OneDrive\Desktop\planilhas_rh\categories.xlsx')
-    questions = pd.read_excel(r'C:\Users\VALEMAIS PROMOTORA\OneDrive\Desktop\planilhas_rh\questions.xlsx')
-    responses = pd.read_excel(r'C:\Users\VALEMAIS PROMOTORA\OneDrive\Desktop\planilhas_rh\responses.xlsx')
-    answers = pd.read_excel(r'C:\Users\VALEMAIS PROMOTORA\OneDrive\Desktop\planilhas_rh\answers.xlsx')
+    surveys = pd.read_excel('arquivos/surveys.xlsx')
+    categories = pd.read_excel('arquivos/categories.xlsx')
+    questions = pd.read_excel('arquivos/questions.xlsx')
+    responses = pd.read_excel('arquivos/responses.xlsx')
+    answers = pd.read_excel('arquivos/answers.xlsx')
     return surveys, categories, questions, responses, answers
 
 try:

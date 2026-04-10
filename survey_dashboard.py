@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-from pathlib import Path
+
 
 st.set_page_config(page_title="Dashboard de Clima Organizacional", layout="wide")
 
@@ -48,6 +48,9 @@ answers['likert_value'] = pd.to_numeric(answers['likert_value'], errors='coerce'
 # Filtra apenas respostas Likert (sem NaN)
 likert_answers = answers[answers['likert_value'].notna()].copy()
 
+# Filtra respostas abertas
+open_answers = answers[answers['open_ended_response'].notna()].copy()
+
 # Merge: answers -> questions -> categories
 data = likert_answers.merge(
     questions[['id', 'question_text', 'category_id']], 
@@ -77,7 +80,7 @@ st.markdown("Pesquisa de Clima 2026")
 st.markdown("---")
 
 # KPIs Principais
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 media_geral = data['likert_value'].mean()
 col1.metric("📈 Média Geral", f"{media_geral:.2f}/5.0", delta=f"{(media_geral/5)*100:.1f}%")
@@ -90,17 +93,14 @@ insatisfeitos = (data['likert_value'] <= 2).sum()
 taxa_insatisfacao = (insatisfeitos / len(data) * 100) if len(data) > 0 else 0
 col3.metric("😞 Insatisfeitos (1-2)", f"{taxa_insatisfacao:.1f}%", delta=f"{insatisfeitos} votos")
 
-desvio = data['likert_value'].std()
-col4.metric("📊 Desvio Padrão", f"{desvio:.2f}", delta="Consistência")
-
-st.write(f"**Total de respostas Likert:** {len(data)} | **Total de respondentes:** {data['response_id'].nunique()}")
+st.write(f"**Total de respostas:** {len(data)} | **Total de respondentes:** {data['response_id'].nunique()}")
 st.markdown("---")
 
 # ======================================================
 # 1. DISTRIBUIÇÃO GERAL
 # ======================================================
 
-st.subheader("1️⃣ Distribuição das Respostas")
+st.subheader("1️⃣ Como as Pessoas Responderam")
 
 dist = data['likert_value'].value_counts().sort_index()
 dist_percent = (dist / len(data) * 100).round(2)
@@ -135,10 +135,10 @@ st.markdown("---")
 # 2. MÉDIA POR CATEGORIA
 # ======================================================
 
-st.subheader("2️⃣ Média por Categoria")
+st.subheader("2️⃣ Satisfação por Categoria")
 
-media_cat = data.groupby('name')['likert_value'].agg(['mean', 'count', 'std']).reset_index()
-media_cat.columns = ['Categoria', 'Média', 'Respostas', 'Desvio']
+media_cat = data.groupby('name')['likert_value'].agg(['mean', 'count']).reset_index()
+media_cat.columns = ['Categoria', 'Média', 'Respostas']
 media_cat = media_cat.sort_values('Média', ascending=False)
 
 # Cores baseadas na média
@@ -158,8 +158,8 @@ fig_cat = go.Figure(data=[
 ])
 
 fig_cat.update_layout(
-    title='Avaliação por Categoria',
-    xaxis_title='Média',
+    title='Ranking de Categorias',
+    xaxis_title='Média (1-5)',
     yaxis_title='Categoria',
     height=400,
     xaxis_range=[0, 5.1],
@@ -176,8 +176,8 @@ st.markdown("---")
 
 st.subheader("3️⃣ Ranking de Perguntas")
 
-media_perg = data.groupby('question_text')['likert_value'].agg(['mean', 'count', 'std']).reset_index()
-media_perg.columns = ['Pergunta', 'Média', 'Respostas', 'Desvio']
+media_perg = data.groupby('question_text')['likert_value'].agg(['mean', 'count']).reset_index()
+media_perg.columns = ['Pergunta', 'Média', 'Respostas']
 media_perg = media_perg.sort_values('Média')
 
 col_top, col_worst = st.columns(2)
@@ -232,73 +232,78 @@ st.markdown("---")
 # 4. INDICADORES DE RISCO
 # ======================================================
 
-st.subheader("4️⃣ Indicadores de Risco")
+st.subheader("4️⃣ Áreas Críticas que Precisam de Atenção")
 
-col_risk1, col_risk2, col_risk3 = st.columns(3)
+col_risk1, col_risk2 = st.columns(2)
 
 # Categorias críticas
 cat_criticas = media_cat[media_cat['Média'] < 3]
 with col_risk1:
+    st.write("**Categorias com Média < 3.0**")
     if len(cat_criticas) > 0:
-        st.warning(f"⚠️ **{len(cat_criticas)} categorias críticas** (média < 3)")
+        st.warning(f"⚠️ {len(cat_criticas)} categoria(s) crítica(s)")
         for _, row in cat_criticas.iterrows():
             st.write(f"• **{row['Categoria']}**: {row['Média']:.2f}/5")
     else:
-        st.success("✅ Nenhuma categoria crítica")
+        st.success("✅ Nenhuma categoria crítica!")
 
 # Perguntas críticas
 perg_criticas = media_perg[media_perg['Média'] < 2.5]
 with col_risk2:
+    st.write("**Perguntas com Média < 2.5**")
     if len(perg_criticas) > 0:
-        st.warning(f"⚠️ **{len(perg_criticas)} perguntas críticas** (média < 2.5)")
+        st.warning(f"⚠️ {len(perg_criticas)} pergunta(s) crítica(s)")
         for _, row in perg_criticas.iterrows():
             texto = row['Pergunta'][:45] + '...'
             st.write(f"• {texto}: {row['Média']:.2f}")
     else:
-        st.success("✅ Nenhuma pergunta crítica")
+        st.success("✅ Nenhuma pergunta crítica!")
 
-# Consistência baixa
-cat_instavel = media_cat[media_cat['Desvio'] > 1.5]
-with col_risk3:
-    if len(cat_instavel) > 0:
-        st.warning(f"⚠️ **{len(cat_instavel)} categorias instáveis** (σ > 1.5)")
-        for _, row in cat_instavel.iterrows():
-            st.write(f"• **{row['Categoria']}**: σ={row['Desvio']:.2f}")
+st.markdown("---")
+
+# ======================================================
+# 5. PERGUNTAS ABERTAS DOS COLABORADORES
+# ======================================================
+
+st.subheader("5️⃣ O que os Colaboradores Disseram (Comentários)")
+
+if len(open_answers) > 0:
+    # Merge com as perguntas para saber qual pergunta aberta é
+    open_data = open_answers.merge(
+        questions[['id', 'question_text']], 
+        left_on='question_id', 
+        right_on='id', 
+        how='left'
+    )
+    
+    # Agrupa por pergunta aberta
+    pergunta_aberta = open_data['question_text'].unique()
+    
+    if len(pergunta_aberta) > 0:
+        pergunta_selecionada = st.selectbox(
+            "Selecione a pergunta aberta:",
+            pergunta_aberta
+        )
+        
+        respostas_selecionadas = open_data[open_data['question_text'] == pergunta_selecionada]
+        
+        st.write(f"**Total de comentários:** {len(respostas_selecionadas)}")
+        st.markdown("---")
+        
+        # Mostra os comentários
+        for idx, row in respostas_selecionadas.iterrows():
+            if pd.notna(row['open_ended_response']):
+                st.write(f"💬 {row['open_ended_response']}")
+                st.markdown("---")
     else:
-        st.success("✅ Respostas bem consistentes")
+        st.info("Nenhuma pergunta aberta encontrada")
+else:
+    st.info("Nenhum comentário foi fornecido pelos colaboradores")
 
 st.markdown("---")
 
 # ======================================================
-# 5. BOX PLOT - DISTRIBUIÇÃO POR CATEGORIA
-# ======================================================
-
-st.subheader("5️⃣ Distribuição de Respostas por Categoria")
-
-fig_box = go.Figure()
-
-for cat in data['name'].unique():
-    cat_data = data[data['name'] == cat]['likert_value']
-    fig_box.add_trace(go.Box(
-        y=cat_data,
-        name=cat,
-        boxmean='sd'
-    ))
-
-fig_box.update_layout(
-    title='Espalhamento das avaliações por categoria',
-    yaxis_title='Nota',
-    height=400,
-    template='plotly_dark',
-    showlegend=False
-)
-
-st.plotly_chart(fig_box, use_container_width=True)
-
-st.markdown("---")
-
-# ======================================================
-# 6. TABELA DE TODAS AS PERGUNTAS
+# 6. TABELA DETALHADA DE PERGUNTAS
 # ======================================================
 
 st.subheader("6️⃣ Detalhamento por Pergunta")
@@ -306,9 +311,8 @@ st.subheader("6️⃣ Detalhamento por Pergunta")
 tabela = media_perg.sort_values('Média', ascending=False).reset_index(drop=True)
 tabela['Rank'] = range(1, len(tabela) + 1)
 tabela['Média'] = tabela['Média'].round(2)
-tabela['Desvio'] = tabela['Desvio'].round(2)
 
-tabela = tabela[['Rank', 'Pergunta', 'Média', 'Respostas', 'Desvio']]
+tabela = tabela[['Rank', 'Pergunta', 'Média', 'Respostas']]
 
 tabela_display = tabela.copy()
 tabela_display['Pergunta'] = tabela_display['Pergunta'].str[:80]
@@ -321,36 +325,41 @@ st.markdown("---")
 # 7. RESUMO EXECUTIVO
 # ======================================================
 
-st.subheader("📄 Resumo Executivo")
+st.subheader("📄 Resumo Executivo para a Liderança")
 
 n_respondentes = data['response_id'].nunique()
 taxa_neutro = ((data['likert_value'] == 3).sum() / len(data) * 100)
+
+# Melhor e pior categoria
+melhor_cat = media_cat.sort_values('Média', ascending=False).iloc[0]
+pior_cat = media_cat.sort_values('Média').iloc[0]
 
 resumo_text = f"""
 ### 📊 Indicadores Principais
 
 | Métrica | Valor |
 |---------|-------|
-| **Média Geral** | {media_geral:.2f}/5.0 ({(media_geral/5)*100:.1f}%) |
+| **Média Geral** | {media_geral:.2f}/5.0 |
 | **Respondentes** | {n_respondentes} pessoas |
 | **Total de Respostas** | {len(data)} respostas |
-| **Satisfeitos (4-5)** | {taxa_satisfacao:.1f}% ({satisfeitos} votos) |
+| **Satisfeitos (4-5)** | {taxa_satisfacao:.1f}% |
 | **Neutros (3)** | {taxa_neutro:.1f}% |
-| **Insatisfeitos (1-2)** | {taxa_insatisfacao:.1f}% ({insatisfeitos} votos) |
-| **Desvio Padrão** | {desvio:.2f} (consistência) |
+| **Insatisfeitos (1-2)** | {taxa_insatisfacao:.1f}% |
 
-### 🎯 Principais Categorias
+### 🎯 Destaques
 
-**Melhores:** {media_cat.sort_values('Média', ascending=False).iloc[0]['Categoria']} ({media_cat['Média'].max():.2f})
+**✅ Melhor categoria:** {melhor_cat['Categoria']} ({melhor_cat['Média']:.2f}/5)
 
-**Críticas:** {', '.join(media_cat[media_cat['Média'] < 3]['Categoria'].tolist()) if len(cat_criticas) > 0 else 'Nenhuma'}
+**⚠️ Pior categoria:** {pior_cat['Categoria']} ({pior_cat['Média']:.2f}/5)
+
+**💬 Total de comentários:** {len(open_answers)} respostas abertas
 
 ### 💡 Recomendações
 
-1. **Fortalecer:** Áreas com média > 4.0 devem servir de modelo
-2. **Agir:** Focar em categorias com média < 3.0
-3. **Estabilizar:** Investigar categorias com desvio padrão > 1.5
-4. **Planejar:** Próxima coleta em: {pd.Timestamp.now().strftime('%B de %Y')}
+1. **Fortalecer:** Replicar boas práticas de {melhor_cat['Categoria']}
+2. **Agir:** Investigar causas em {pior_cat['Categoria']}
+3. **Escutar:** Analisar os comentários dos colaboradores
+4. **Próximas etapas:** Criar plano de ação baseado nesses insights
 """
 
 st.markdown(resumo_text)
